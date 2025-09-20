@@ -1,3 +1,4 @@
+本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git）
 # 运行方法
 
 ## 安装依赖
