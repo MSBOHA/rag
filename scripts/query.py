@@ -5,13 +5,11 @@
 def main():
     import os
     import yaml
-    from src.loaders.loader import auto_loader
-    from src.splitters.splitter import get_splitter
+    import sys
     from src.embeddings.embedding import get_embedder
     from src.vectordb.vectordb import get_vectordb
     from src.retriever.retriever import get_retriever
     from src.llms.llm_api import get_llm
-    from src.chains.rag_chain import RAGChain
 
     # 读取配置
     with open('configs/config.yaml', 'r', encoding='utf-8') as f:
@@ -49,52 +47,58 @@ def main():
     if len(db_files) > 1:
         print("该库下有多个数据库文件，默认选第一个：", db_files[0])
     db_path = os.path.join(db_folder_path, db_files[0])
-    print(f"[1/6] 加载向量数据库: {db_path}")
+    print(f"[1/5] 加载向量数据库: {db_path}")
     loader = None  # 查询时不再需要loader
-    print(f"[2/6] 文本切分方式: {split_method}")
-    splitter_kwargs = {}
-    if split_method == 'lines':
-        lines_per_chunk = config.get('lines_per_chunk')
-        if lines_per_chunk is None:
-            raise ValueError('切分方式为lines时，必须在config.yaml中指定lines_per_chunk')
-        splitter_kwargs['lines_per_chunk'] = lines_per_chunk
-    elif split_method == 'length':
-        max_length = config.get('max_length')
-        overlap = config.get('overlap')
-        if max_length is None or overlap is None:
-            raise ValueError('切分方式为length时，必须在config.yaml中指定max_length和overlap')
-        splitter_kwargs['max_length'] = max_length
-        splitter_kwargs['overlap'] = overlap
-    splitter = get_splitter(method=split_method, **splitter_kwargs)
-    print(f"[3/6] 加载Embedding模型: {embedding_model}")
+    # 不再需要文本切分方式，直接检索
+    print(f"[2/5] 加载Embedding模型: {embedding_model}")
     embedder = get_embedder(embedding_model)
     dim = len(embedder.embed("测试"))
-    print(f"[4/6] 加载向量数据库: {db_path}")
+    print(f"[3/5] 加载向量数据库: {db_path}")
     vectordb = get_vectordb(dim, db_path)
     # 动态加载重排模型
     reranker = True
     if rerank_model:
-        print(f"[5/6] 加载重排模型: {rerank_model}")
+        print(f"[4/5] 加载重排模型: {rerank_model}")
         try:
             from sentence_transformers import CrossEncoder
             reranker = CrossEncoder(rerank_model)
         except Exception as e:
             print(f"重排模型加载失败: {e}")
     else:
-        print("[5/6] 未配置重排模型，跳过重排")
+        print("[4/5] 未配置重排模型，跳过重排")
     retriever = get_retriever(vectordb, embedder, reranker)
     llm = get_llm(llm_model)
 
-    print(f"[6/6] 检索并生成答案...")
-    rag = RAGChain(None, splitter, embedder, vectordb, retriever, llm)
-    query_text = input("请输入查询内容：")
-    out = rag.query(query_text, top_k=top_k, rerank_k=rerank_k)
-    print("检索结果：")
-    for i, r in enumerate(out["results"]):
-        print(f"[{i}] 分数: {r['score']:.4f}")
-        print(f"内容: {r['metadata']['text'][:100]}...\n")
-    print("\nLLM生成答案：")
-    print(out["answer"])
+    is_chat = '--chat' in sys.argv
+    if is_chat:
+        print("多轮对话模式已开启，输入 exit/quit 结束。")
+        messages = []
+        while True:
+            query_text = input("用户: ")
+            if query_text.strip().lower() in ("exit", "quit"): break
+            results = retriever.retrieve(query_text, top_k=top_k, rerank_k=rerank_k)
+            print("检索结果：")
+            for i, r in enumerate(results):
+                print(f"[{i}] 分数: {r['score']:.4f}")
+                print(f"内容: {r['metadata']['text'][:100]}...\n")
+            chunks = [r['metadata']['text'] for r in results]
+            # 多轮对话，历史messages+当前问题
+            messages.append({"role": "user", "content": query_text})
+            answer = llm.generate(query_text, chunks, messages=messages)
+            print("LLM: ", answer)
+            messages.append({"role": "assistant", "content": answer})
+    else:
+        print(f"[5/5] 检索并生成答案...")
+        query_text = input("请输入查询内容：")
+        results = retriever.retrieve(query_text, top_k=top_k, rerank_k=rerank_k)
+        print("检索结果：")
+        for i, r in enumerate(results):
+            print(f"[{i}] 分数: {r['score']:.4f}")
+            print(f"内容: {r['metadata']['text'][:100]}...\n")
+        chunks = [r['metadata']['text'] for r in results]
+        answer = llm.generate(query_text, chunks)
+        print("\nLLM生成答案：")
+        print(answer)
 
 if __name__ == "__main__":
     main()

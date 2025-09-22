@@ -21,8 +21,15 @@ class GeminiLLM(BaseLLM):
         self.client = genai.Client()
         self.model_name = model_name
 
-    def generate(self, query: str, chunks: List[str]) -> str:
-        prompt = f"""你是一位知识助手，请根据用户的问题和下列片段生成准确的回答。\n\n用户问题: {query}\n\n相关片段:\n{"\n\n".join(chunks)}\n\n请基于上述内容作答，不要编造信息。"""
+    def generate(self, query: str, chunks: List[str], messages: list = None) -> str:
+        # 可选：拼接历史messages到prompt
+        history = ""
+        if messages:
+            for m in messages:
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                history += f"{role}: {content}\n"
+        prompt = f"{history}\n用户问题: {query}\n\n相关片段:\n{'\n\n'.join(chunks)}\n\n请基于上述内容作答，不要编造信息。"
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=prompt
@@ -42,19 +49,37 @@ class QwenLLM(BaseLLM):
         )
         self.model_name = model_name
 
-    def generate(self, query: str, chunks: List[str]) -> str:
-        prompt = f"你是一位知识助手，请根据用户的问题和下列片段生成准确的回答。\n\n用户问题: {query}\n\n相关片段:\n{'\n\n'.join(chunks)}\n\n请基于上述内容作答，不要编造信息。"
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ]
-        completion = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            stream=False
-        )
-        # 兼容openai返回格式
-        return completion.choices[0].message.content
+    def generate(self, query: str, chunks: List[str], messages: list = None) -> str:
+        # 如果传入messages则直接用，否则兼容原RAG模式
+        if messages:
+            stream = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                stream=True
+            )
+            content = ""
+            for chunk in stream:
+                delta = getattr(chunk.choices[0].delta, "content", None)
+                if delta:
+                    content += delta
+            return content
+        else:
+            prompt = f"你是一位知识助手，请根据用户的问题和下列片段生成准确的回答。\n\n用户问题: {query}\n\n相关片段:\n{'\n\n'.join(chunks)}\n\n请基于上述内容作答，不要编造信息。"
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
+            stream = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                stream=True
+            )
+            content = ""
+            for chunk in stream:
+                delta = getattr(chunk.choices[0].delta, "content", None)
+                if delta:
+                    content += delta
+            return content
 
 def get_llm(model_name: str = "gemini-2.5-flash") -> BaseLLM:
     if model_name.startswith("qwen"):
