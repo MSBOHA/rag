@@ -50,4 +50,4 @@ https://aistudio.google.com/apikey
 
 
 
-本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git）
+本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git)
