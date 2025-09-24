@@ -64,10 +64,19 @@ class QwenLLM(BaseLLM):
                     content += delta
             return content
         else:
-            prompt = f"你是一位知识助手，请根据用户的问题和下列片段生成准确的回答。\n\n用户问题: {query}\n\n相关片段:\n{'\n\n'.join(chunks)}\n\n请基于上述内容作答，不要编造信息。"
+            system_prompt = (
+                "你是一位知识助手，请严格根据下列检索到的文档片段回答用户问题，不要编造信息，也不要泛化。"
+                "不要使用外部知识。如果没提到，就说‘未提及’。回答时请引用片段编号或内容。"
+                "如无相关内容请直接说明。"
+            )
+            user_prompt = (
+                f"用户问题: {query}\n\n相关片段（编号从0开始）：\n"
+                + '\n\n'.join([f"[{i}] {chunk}" for i, chunk in enumerate(chunks)])
+                + "\n\n请基于上述片段作答，如无相关内容请说明。"
+            )
             messages = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ]
             stream = self.client.chat.completions.create(
                 model=self.model_name,

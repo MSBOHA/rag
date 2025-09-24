@@ -13,30 +13,21 @@ def main():
     from src.embeddings.embedding import get_embedder
     from src.vectordb.vectordb import get_vectordb
     from src.retriever.retriever import get_retriever
-    from src.llms.llm_api import get_llm
-    from src.chains.rag_chain import RAGChain
-
+    # 不需要 LLM 和 RAGChain
     # 读取配置
     with open('configs/config.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
-    doc_root = config.get('doc_path', None)
+    doc_dir = config.get('doc_path', None)
     split_method = config.get('split_method', 'paragraph')
     embedding_model = config.get('embedding_model', 'shibing624/text2vec-base-chinese')
+    index_dir = config.get('index_path', None)
 
-    if not doc_root or not os.path.isdir(doc_root):
+    if not doc_dir or not os.path.isdir(doc_dir):
         raise ValueError('配置文件缺少 doc_path 或不是文件夹，请在 configs/config.yaml 中指定文档根目录路径')
-
-    # 枚举所有子文件夹
-    doc_folders = [d for d in os.listdir(doc_root) if os.path.isdir(os.path.join(doc_root, d))]
-    if not doc_folders:
-        raise ValueError(f'文档根目录 {doc_root} 下没有任何子文件夹')
-    print("可用文档文件夹:")
-    for i, dname in enumerate(doc_folders):
-        print(f"[{i}] {dname}")
-    idx = int(input("请选择要批量建库的文件夹编号: "))
-    doc_dir = os.path.join(doc_root, doc_folders[idx])
-    doc_folder_name = doc_folders[idx]
+    if not index_dir:
+        raise ValueError('配置文件缺少 index_path，请在 configs/config.yaml 中指定索引保存目录')
+    os.makedirs(index_dir, exist_ok=True)
 
     # 枚举文件夹下所有文件
     file_list = [f for f in os.listdir(doc_dir) if os.path.isfile(os.path.join(doc_dir, f))]
@@ -61,17 +52,10 @@ def main():
     print(f"[3/5] 加载Embedding模型: {embedding_model}")
     embedder = get_embedder(embedding_model)
     dim = len(embedder.embed("测试"))
-    print(f"[4/5] 初始化向量数据库，维度: {dim}")
-    llm = get_llm(config.get('llm_model', 'gemini-2.5-flash'))
-
-    # 按照文件夹名在indexes下创建子文件夹
-    index_dir = os.path.join('indexes', doc_folder_name)
-    os.makedirs(index_dir, exist_ok=True)
-
-    # 只初始化一次库和RAGChain
-    vectordb = get_vectordb(dim)
-    retriever = get_retriever(vectordb, embedder)
-    rag = RAGChain(None, splitter, embedder, vectordb, retriever, llm)
+    metric = config.get('metric', 'ip')
+    index_type = config.get('index_type', 'flat')
+    print(f"[4/5] 初始化向量数据库，维度: {dim}, metric: {metric}, index_type: {index_type}")
+    vectordb = get_vectordb(dim, metric=metric, index_type=index_type)
     all_chunks = []
     all_metadatas = []
     for fname in file_list:
@@ -90,9 +74,9 @@ def main():
     print(f"\n>>> 正在批量嵌入并写入向量库，总片段数: {len(all_chunks)}")
     embeddings = embedder.batch_embed(all_chunks) if hasattr(embedder, 'batch_embed') else [embedder.embed(x) for x in all_chunks]
     vectordb.add(embeddings, all_metadatas)
-    save_path = os.path.join(index_dir, f"{doc_folder_name}_faiss.index")
+    save_path = os.path.join(index_dir, f"{os.path.basename(os.path.normpath(doc_dir))}_faiss.index")
     vectordb.save(save_path)
-    print(f"✅ 向量库已保存到: {save_path}")
+    print(f" 向量库已保存到: {save_path}")
 
 if __name__ == "__main__":
     main()
