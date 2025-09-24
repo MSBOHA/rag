@@ -23,12 +23,13 @@ RAG 多模态检索系统
 - 在项目根目录下创建 `.env` 文件，内容示例：
 	```ini
 	DASHSCOPE_API_KEY=你的阿里云API Key
-    https://www.aliyun.com/product/bailian
     GEMINI_API_KEY=你的GEMINI API Key
-    https://aistudio.google.com/apikey
+
 	# 其他API Key可按需添加
 	```
-
+api申请地址：
+https://www.aliyun.com/product/bailian
+https://aistudio.google.com/apikey
 
 ### 3. 多模态文档支持
 
@@ -49,4 +50,4 @@ RAG 多模态检索系统
 
 
 
-本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git）
+本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git)
