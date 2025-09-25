@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 """
 构建/更新向量数据库索引脚本
@@ -17,7 +18,7 @@ def main():
     # 读取配置
     with open('configs/config.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
-
+    time_start = time.time()
     doc_dir = config.get('doc_path', None)
     split_method = config.get('split_method', 'paragraph')
     embedding_model = config.get('embedding_model', 'shibing624/text2vec-base-chinese')
@@ -75,6 +76,7 @@ def main():
             all_metadatas.extend([{"source": fname, "text": chunk} for chunk in chunks])
     # 批量嵌入并入库
     print(f"\n>>> 正在批量嵌入并写入向量库，总片段数: {len(all_chunks)}")
+    print(f"可批量嵌入: {hasattr(embedder, 'batch_embed')}")
     embeddings = embedder.batch_embed(all_chunks) if hasattr(embedder, 'batch_embed') else [embedder.embed(x) for x in all_chunks]
     vectordb.add(embeddings, all_metadatas)
     bm25db.add(all_chunks, all_metadatas)
@@ -87,6 +89,7 @@ def main():
     bm25db.save(bm25_path)
     print(f" 向量库已保存到: {save_path}")
     print(f" BM25库已保存到: {bm25_path}")
-
+    time_end = time.time()
+    print(f"总用时: {time_end - time_start} 秒")
 if __name__ == "__main__":
     main()

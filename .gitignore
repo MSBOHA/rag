@@ -24,3 +24,8 @@ venv/
 # 忽略操作系统文件
 .DS_Store  # macOS
 Thumbs.db  # Windows
+# 忽略 data/clock_sync_secure 及其所有内容
+/data/clock_sync_secure/
+
+# 忽略 indexes/clock_sync_secure 及其所有内容
+/indexes/clock_sync_secure/

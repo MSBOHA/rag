@@ -21,9 +21,11 @@ def rewrite_and_classify_query(query: str, model_name: str = "qwen-plus") -> Lis
     import json
     try:
         parsed = json.loads(result)
-        if isinstance(parsed, list):
+        if isinstance(parsed, list) and parsed:
             return parsed[:3]  # 最多只保留前3个query
         else:
+            # 不是合法list或为空，兜底用原输入
             return [{'query': query, 'intent': '未知'}]
-    except Exception:
+    except Exception as e:
+        print(f"[rewrite_and_classify_query] LLM输出无法解析为JSON，原始输出: {result}\n异常: {e}")
         return [{'query': query, 'intent': '未知'}]

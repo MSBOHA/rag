@@ -15,6 +15,8 @@ class SentenceTransformerEmbedding(BaseEmbedding):
         self.model = SentenceTransformer(model_name)
     def embed(self, text: str) -> List[float]:
         return self.model.encode(text, normalize_embeddings=True).tolist()
+    def batch_embed(self, texts: list) -> list:
+        return self.model.encode(texts, normalize_embeddings=True).tolist()
 
 def get_embedder(model_name: str = "shibing624/text2vec-base-chinese") -> BaseEmbedding:
     return SentenceTransformerEmbedding(model_name)

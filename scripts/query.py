@@ -2,7 +2,7 @@ import os
 import yaml
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import time
 def load_config():
     with open('configs/config.yaml', 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
@@ -12,7 +12,7 @@ def main():
     from src.vectordb.vectordb import get_vectordb
     from src.retriever.retriever import get_retriever
     from src.llms.llm_api import get_llm
-
+    start_time = time.time()
     config = load_config()
     db_dir = config.get('vector_db_path') or config.get('index_path') or config.get('db_path')
     if not db_dir or not os.path.isdir(db_dir):
@@ -59,7 +59,8 @@ def main():
         print("[4/5] 未配置重排模型，跳过重排")
     retriever = get_retriever(vectordb, embedder, reranker, bm25db=bm25db)
     llm = get_llm(llm_model)
-
+    end_time = time.time()
+    print(f"初始化完成，耗时: {end_time - start_time:.2f} 秒")
     # 支持 --chat 多轮对话模式
     from src.query_rewrite.rewrite import rewrite_and_classify_query
     is_chat = '--chat' in sys.argv
