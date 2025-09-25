@@ -1,3 +1,6 @@
+from rank_bm25 import BM25Okapi
+import jieba
+import pickle
 """
 向量数据库接口和实现，支持多库管理和本地持久化
 """
@@ -9,6 +12,8 @@ import faiss
 from typing import List, Optional
 
 class BaseVectorDB:
+    def __init__(self):
+        pass
     def add(self, vectors, metadatas=None):
         raise NotImplementedError
     def search(self, query_vector, top_k=5):
@@ -17,6 +22,54 @@ class BaseVectorDB:
         raise NotImplementedError
     def load(self, path: str):
         raise NotImplementedError
+# BM25 检索实现
+class BM25VectorDB(BaseVectorDB):
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path
+        self.docs = []  # 原文
+        self.metadatas = []
+        self.corpus = []  # 分词后文档
+        self.bm25 = None
+        if db_path and os.path.exists(db_path):
+            self.load(db_path)
+
+    def add(self, docs: list, metadatas: Optional[list] = None):
+        # docs: List[str]
+        self.docs.extend(docs)
+        self.corpus.extend([list(jieba.cut(doc)) for doc in docs])
+        if metadatas:
+            self.metadatas.extend(metadatas)
+        else:
+            self.metadatas.extend([None] * len(docs))
+        self.bm25 = BM25Okapi(self.corpus)
+
+    def search(self, query: str, top_k=5):
+        if not self.bm25:
+            self.bm25 = BM25Okapi(self.corpus)
+        query_tokens = list(jieba.cut(query))
+        scores = self.bm25.get_scores(query_tokens)
+        top_idxs = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+        results = []
+        for i in top_idxs:
+            results.append({
+                'score': float(scores[i]),
+                'index': i,
+                'metadata': self.metadatas[i] if i < len(self.metadatas) else None,
+                'text': self.docs[i]
+            })
+        return results
+
+    def save(self, path: str):
+        with open(path, 'wb') as f:
+            pickle.dump({'docs': self.docs, 'metadatas': self.metadatas, 'corpus': self.corpus}, f)
+
+    def load(self, path: str):
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+            self.docs = data.get('docs', [])
+            self.metadatas = data.get('metadatas', [])
+            self.corpus = data.get('corpus', [])
+            self.bm25 = BM25Okapi(self.corpus) if self.corpus else None
 
 class FaissVectorDB(BaseVectorDB):
     def __init__(self, dim: int, db_path: Optional[str] = None, metric: str = 'ip', index_type: str = 'flat', nlist: int = 100, hnsw_m: int = 32):
@@ -99,4 +152,6 @@ class FaissVectorDB(BaseVectorDB):
             self.metadatas = []
 
 def get_vectordb(dim: int, db_path: Optional[str] = None, metric: str = 'ip', index_type: str = 'flat') -> FaissVectorDB:
+    if index_type == 'bm25':
+        return BM25VectorDB(db_path)
     return FaissVectorDB(dim, db_path, metric, index_type)

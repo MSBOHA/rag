@@ -40,6 +40,13 @@ def main():
     index_type = config.get('index_type', 'flat')
     print(f"[3/5] 加载向量数据库: {db_path}, metric: {metric}, index_type: {index_type}")
     vectordb = get_vectordb(dim, db_path, metric=metric, index_type=index_type)
+    # 尝试加载BM25库
+    from src.vectordb.vectordb import BM25VectorDB
+    bm25_path = db_path.replace('_faiss.index', '_bm25.pkl')
+    bm25db = None
+    if os.path.exists(bm25_path):
+        bm25db = BM25VectorDB(bm25_path)
+        print(f"[3.5/5] 加载BM25库: {bm25_path}")
     reranker = True
     if rerank_model:
         print(f"[4/5] 加载重排模型: {rerank_model}")
@@ -50,7 +57,7 @@ def main():
             print(f"重排模型加载失败: {e}")
     else:
         print("[4/5] 未配置重排模型，跳过重排")
-    retriever = get_retriever(vectordb, embedder, reranker)
+    retriever = get_retriever(vectordb, embedder, reranker, bm25db=bm25db)
     llm = get_llm(llm_model)
 
     # 支持 --chat 多轮对话模式

@@ -56,6 +56,9 @@ def main():
     index_type = config.get('index_type', 'flat')
     print(f"[4/5] 初始化向量数据库，维度: {dim}, metric: {metric}, index_type: {index_type}")
     vectordb = get_vectordb(dim, metric=metric, index_type=index_type)
+    # BM25库（只要不是bm25就都建）
+    from src.vectordb.vectordb import BM25VectorDB
+    bm25db = BM25VectorDB()
     all_chunks = []
     all_metadatas = []
     for fname in file_list:
@@ -74,9 +77,16 @@ def main():
     print(f"\n>>> 正在批量嵌入并写入向量库，总片段数: {len(all_chunks)}")
     embeddings = embedder.batch_embed(all_chunks) if hasattr(embedder, 'batch_embed') else [embedder.embed(x) for x in all_chunks]
     vectordb.add(embeddings, all_metadatas)
-    save_path = os.path.join(index_dir, f"{os.path.basename(os.path.normpath(doc_dir))}_faiss.index")
+    bm25db.add(all_chunks, all_metadatas)
+    # 保证每个库单独子文件夹
+    subdir = os.path.join(index_dir, os.path.basename(os.path.normpath(doc_dir)))
+    os.makedirs(subdir, exist_ok=True)
+    save_path = os.path.join(subdir, f"{os.path.basename(os.path.normpath(doc_dir))}_faiss.index")
     vectordb.save(save_path)
+    bm25_path = save_path.replace('_faiss.index', '_bm25.pkl')
+    bm25db.save(bm25_path)
     print(f" 向量库已保存到: {save_path}")
+    print(f" BM25库已保存到: {bm25_path}")
 
 if __name__ == "__main__":
     main()

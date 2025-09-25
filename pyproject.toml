@@ -1,3 +1,4 @@
+
 [project]
 name = "rag"
 version = "0.1.0"
@@ -14,5 +15,7 @@ dependencies = [
     "pillow>=10.0.0",
     "openai>=1.108.1",
     "streamlit>=1.24.1",
-    "pyyaml>=6.0"
+    "pyyaml>=6.0",
+    "rank_bm25>=0.2.1",
+    "jieba>=0.42.1"
 ]
