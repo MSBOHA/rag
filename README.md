@@ -2,16 +2,15 @@
 
 ## 安装依赖
 
-首先请确保你的系统已经安装了 uv 和 Jupyter，否则请参照如下链接安装：
+
 
 
 RAG 多模态检索系统
 
-## 快速开始
 
 ### 1. 环境准备
 
-- 推荐使用 [uv](https://github.com/astral-sh/uv) 进行依赖管理和虚拟环境：
+- 使用 [uv](https://github.com/astral-sh/uv) 进行依赖管理和虚拟环境：
 	```sh
 	pip install uv
 	uv sync
@@ -43,10 +42,6 @@ https://aistudio.google.com/apikey
 - 运行 `python -m scripts.build_index`，选择数据文件夹批量建库。
 - 运行 `python -m scripts.query`，选择库并输入问题进行检索。
 
-### 5. 其他说明
-
-- LLM 支持阿里云 DashScope（Qwen）、Google Gemini 等，需在 `.env` 配置对应 API Key。
-- 支持多数据集、多库管理，索引和数据自动按文件夹归档。
 
 
 
