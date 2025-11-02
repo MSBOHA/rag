@@ -1,14 +1,19 @@
-doc_path: data/eval
-embedding_model: C:/Users/18306/.cache/huggingface/hub/models--shibing624--text2vec-base-chinese/snapshots/183bb99aa7af74355fb58d16edf8c13ae7c5433e
-index_path: indexes/
-lines_per_chunk: 3
-llm_model: gemini-2.5-flash
+doc_path: data/clock_sync_secure
+embedding_model: Qwen/Qwen3-Embedding-0.6B
+index_path: indexes/clock_sync_secure/
+lines_per_chunk: 30
+llm_model: qwen-plus
 max_length: 256
 overlap: 10
-rerank_k: 5
+rerank_k: 20
 rerank_model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
-split_method: paragraph
-top_k: 5
-vector_db_path: indexes/eval/
+split_method: length
+top_k: 100
+vector_db_path: indexes/clock_sync_secure/
 metric: ip
 index_type: hnsw
+
+# precision: fp16
+# max_seq_length: 512
+# empty_cache_interval: 8
+# mem_log_interval: 8

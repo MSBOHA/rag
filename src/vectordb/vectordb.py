@@ -30,24 +30,47 @@ class BM25VectorDB(BaseVectorDB):
         self.metadatas = []
         self.corpus = []  # 分词后文档
         self.bm25 = None
+        self._needs_build = False
         if db_path and os.path.exists(db_path):
             self.load(db_path)
 
-    def add(self, docs: list, metadatas: Optional[list] = None):
+    def add(self, docs: list, metadatas: Optional[list] = None, rebuild: bool = False):
+        """
+        添加文档到内存（不强制重建 BM25 索引，避免频繁重建开销）。
+        若需要立即重建，可传入 rebuild=True。
+        """
         # docs: List[str]
         self.docs.extend(docs)
+        # 使用 jieba 分词后追加到 corpus
         self.corpus.extend([list(jieba.cut(doc)) for doc in docs])
         if metadatas:
             self.metadatas.extend(metadatas)
         else:
             self.metadatas.extend([None] * len(docs))
-        self.bm25 = BM25Okapi(self.corpus)
+        # 标记需要构建
+        self._needs_build = True
+        if rebuild:
+            # 立即构建（一般不推荐在大批量场景中使用）
+            self.bm25 = BM25Okapi(self.corpus)
+            self._needs_build = False
+
+    def build(self):
+        """在完成所有 add 后调用，真正构建 BM25 索引（一次性开销）。"""
+        if self._needs_build:
+            self.bm25 = BM25Okapi(self.corpus)
+            self._needs_build = False
 
     def search(self, query: str, top_k=5):
         if not self.bm25:
-            self.bm25 = BM25Okapi(self.corpus)
+            # 如果尚未构建则按需构建（懒构建）
+            if self.corpus:
+                self.bm25 = BM25Okapi(self.corpus)
+                self._needs_build = False
+            else:
+                return []
         query_tokens = list(jieba.cut(query))
         scores = self.bm25.get_scores(query_tokens)
+        # 选 top_k 索引
         top_idxs = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
         results = []
         for i in top_idxs:
@@ -123,7 +146,20 @@ class FaissVectorDB(BaseVectorDB):
             self.metadatas.extend([None] * len(vectors))
 
     def search(self, query_vector: List[float], top_k=5):
-        arr = np.array([query_vector], dtype=np.float32)
+        # 兼容多种输入形状：
+        # - (dim,) 或 list[float]
+        # - (1, dim)
+        # - (1, 1, dim)（上游已是批量向量又被再次包裹）
+        arr = np.asarray(query_vector, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = arr[None, :]
+        elif arr.ndim > 2:
+            # 展平前导维，保留最后一维为 dim，然后仅取第一条查询
+            arr = arr.reshape(-1, arr.shape[-1])
+        # 只使用第一条查询
+        arr = arr[:1, :]
+        if arr.shape[1] != self.dim:
+            raise ValueError(f"查询向量维度不匹配: got {arr.shape[1]}, expected {self.dim}")
         if self.metric == 'cosine':
             arr = arr / (np.linalg.norm(arr, axis=1, keepdims=True) + 1e-8)
         scores, idxs = self.index.search(arr, top_k)
@@ -143,6 +179,11 @@ class FaissVectorDB(BaseVectorDB):
 
     def load(self, path: str):
         self.index = faiss.read_index(path)
+        # 同步维度为索引的真实维度，避免外部传入 dim 错误造成不一致
+        try:
+            self.dim = int(self.index.d)
+        except Exception:
+            pass
         import json
         meta_path = path + '.meta.json'
         if os.path.exists(meta_path):

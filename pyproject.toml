@@ -1,8 +1,8 @@
 
 [project]
 name = "rag"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = ""
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -20,3 +20,6 @@ dependencies = [
     "jieba>=0.42.1",
     "nltk>=3.8.1"
 ]
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu121"

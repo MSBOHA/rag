@@ -33,13 +33,52 @@ def main():
     top_k = config.get('top_k', 5)
     rerank_k = config.get('rerank_k', 10)
 
+    # 如存在索引信息文件，则优先使用其中记录的嵌入模型与参数，避免维度不一致
+    index_info = None
+    info_path = db_path + '.info.json'
+    if os.path.exists(info_path):
+        try:
+            import json
+            with open(info_path, 'r', encoding='utf-8') as f:
+                index_info = json.load(f)
+        except Exception:
+            index_info = None
+
+    precision = config.get('precision')
+    max_seq_len_cfg = config.get('max_seq_length', None)
+    if index_info:
+        # 覆盖到与索引一致的 embed 配置（以减少出错概率）
+        if index_info.get('embedding_model'):
+            embedding_model = index_info['embedding_model']
+        if index_info.get('precision'):
+            precision = index_info.get('precision')
+        if index_info.get('max_seq_length') is not None and max_seq_len_cfg is None:
+            max_seq_len_cfg = index_info.get('max_seq_length')
     print(f"[2/5] 加载Embedding模型: {embedding_model}")
-    embedder = get_embedder(embedding_model)
-    dim = len(embedder.embed("测试"))
+    embedder = get_embedder(embedding_model, precision=precision)
+    # 设置 max_seq_length（如配置）
+    if max_seq_len_cfg is not None:
+        try:
+            embedder.model.max_seq_length = int(max_seq_len_cfg)
+        except Exception:
+            pass
+    # 正确获取向量维度
+    test_emb = embedder.embed("测试", convert_to_tensor=False)
+    dim = int(test_emb.shape[-1])
     metric = config.get('metric', 'ip')
     index_type = config.get('index_type', 'flat')
     print(f"[3/5] 加载向量数据库: {db_path}, metric: {metric}, index_type: {index_type}")
     vectordb = get_vectordb(dim, db_path, metric=metric, index_type=index_type)
+    # 维度一致性校验（embedder vs index）
+    if hasattr(vectordb, 'dim') and vectordb.dim is not None:
+        index_dim = int(vectordb.dim)
+        if dim != index_dim:
+            raise ValueError(
+                f"Embedding 维度({dim}) 与索引维度({index_dim})不一致。\n"
+                f"- 当前嵌入模型: {embedding_model}\n"
+                f"- 索引文件: {db_path}\n"
+                f"请在 configs/config.yaml 中将 embedding_model 调整为构建索引时使用的模型，或重新用当前模型重建索引。"
+            )
     # 尝试加载BM25库
     from src.vectordb.vectordb import BM25VectorDB
     bm25_path = db_path.replace('_faiss.index', '_bm25.pkl')

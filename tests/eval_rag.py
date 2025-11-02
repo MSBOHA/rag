@@ -76,7 +76,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['retrieval', 'answer'], required=True)
     parser.add_argument('--file', required=True)
-    parser.add_argument('--top_k', type=int, default=5)
+    parser.add_argument('--top_k', type=int, default=1)
     parser.add_argument('--sample_k', type=int, default=5, help='随机抽样评测的样本数，默认5')
     parser.add_argument('--use_jieba', action='store_true', help='是否用jieba分词评测，默认不分词')
     args = parser.parse_args()
