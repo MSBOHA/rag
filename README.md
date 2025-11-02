@@ -42,7 +42,3 @@ https://aistudio.google.com/apikey
 - 运行 `python -m scripts.build_index`，选择数据文件夹批量建库。
 - 运行 `python -m scripts.query`，选择库并输入问题进行检索。
 
-
-
-
-本项目基于 MarkTechStation 的 RAG 系统实现（https://github.com/MarkTechStation/VideoCode.git)
